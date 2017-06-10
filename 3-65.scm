@@ -1,0 +1,11 @@
+(define (ln2-summand n)
+  (cons-stream (/ 1 n)
+	       (stream-map - (ln2-summand (+ n 1)))))
+(define ln2 (partial-sums (ln2-summand 1)))
+(define (partial-sums s)
+  (define guess
+    (cons-stream 0 (add-streams s guess)))
+  (stream-cdr guess))
+(define (add-streams s1 s2)
+  (cons-stream (+ (stream-car s1) (stream-car s2))
+	       (add-streams (stream-cdr s1) (stream-cdr s2))))

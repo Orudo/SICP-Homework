@@ -1,0 +1,4 @@
+(define (ln2-summand n)
+  (cons-stream (/ 1 n)
+	       (stream - (ln2-summand (+ n 1)))))
+(define ln2 (ln2-summand 1))
