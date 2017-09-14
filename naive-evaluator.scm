@@ -25,8 +25,6 @@
 	  (list-of-value (operand exp) env)))
 	(else
 	 (error "Unknown expression type--EVAL" exp))))
-
-
 (define (showtag exp)
   (car tag))
 

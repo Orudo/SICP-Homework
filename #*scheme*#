@@ -1,0 +1,166 @@
+MIT/GNU Scheme running under GNU/Linux
+Type `^C' (control-C) followed by `H' to obtain information about interrupts.
+
+Copyright (C) 2014 Massachusetts Institute of Technology
+This is free software; see the source for copying conditions. There is NO warranty; not
+even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+Image saved on Sunday August 20, 2017 at 12:22:14 PM
+  Release 9.2 || Microcode 15.3 || Runtime 15.7 || SF 4.41 || LIAR/C 4.118 || Edwin 3.116
+
+1 ]=> (load "/home/martin/myProjects/SICP-Homework/evaluator-naive.scm")
+
+;Loading "evaluator-naive.scm"...
+;Premature EOF on #[input-port 2 for file: "/home/martin/myProjects/SICP-Homework/evaluator-naive.scm"]
+;To continue, call RESTART with an option number:
+; (RESTART 1) => Return to read-eval-print level 1.
+
+2 error> (load "/home/martin/myProjects/SICP-Homework/evaluator-naive.scm")
+
+;  Loading "evaluator-naive.scm"...
+;Premature EOF on #[input-port 3 for file: "/home/martin/myProjects/SICP-Homework/evaluator-naive.scm"]
+;To continue, call RESTART with an option number:
+; (RESTART 2) => Return to read-eval-print level 2.
+; (RESTART 1) => Return to read-eval-print level 1.
+
+3 error> (load "/home/martin/myProjects/SICP-Homework/evaluator-naive.scm")
+
+;    Loading "evaluator-naive.scm"...
+;Premature EOF on #[input-port 4 for file: "/home/martin/myProjects/SICP-Homework/evaluator-naive.scm"]
+;To continue, call RESTART with an option number:
+; (RESTART 3) => Return to read-eval-print level 3.
+; (RESTART 2) => Return to read-eval-print level 2.
+; (RESTART 1) => Return to read-eval-print level 1.
+
+4 error> (load "/home/martin/myProjects/SICP-Homework/evaluator-naive.scm")
+
+;      Loading "evaluator-naive.scm"...
+;Premature EOF on #[input-port 5 for file: "/home/martin/myProjects/SICP-Homework/evaluator-naive.scm"]
+;To continue, call RESTART with an option number:
+; (RESTART 4) => Return to read-eval-print level 4.
+; (RESTART 3) => Return to read-eval-print level 3.
+; (RESTART 2) => Return to read-eval-print level 2.
+; (RESTART 1) => Return to read-eval-print level 1.
+
+5 error> (load "/home/martin/myProjects/SICP-Homework/evaluator-naive.scm")
+
+;        Loading "evaluator-naive.scm"...
+;Premature EOF on #[input-port 6 for file: "/home/martin/myProjects/SICP-Homework/evaluator-naive.scm"]
+;To continue, call RESTART with an option number:
+; (RESTART 5) => Return to read-eval-print level 5.
+; (RESTART 4) => Return to read-eval-print level 4.
+; (RESTART 3) => Return to read-eval-print level 3.
+; (RESTART 2) => Return to read-eval-print level 2.
+; (RESTART 1) => Return to read-eval-print level 1.
+
+6 error> (load "/home/martin/myProjects/SICP-Homework/evaluator-naive.scm")
+
+;          Loading "evaluator-naive.scm"...
+;Premature EOF on #[input-port 7 for file: "/home/martin/myProjects/SICP-Homework/evaluator-naive.scm"]
+;To continue, call RESTART with an option number:
+; (RESTART 6) => Return to read-eval-print level 6.
+; (RESTART 5) => Return to read-eval-print level 5.
+; (RESTART 4) => Return to read-eval-print level 4.
+; (RESTART 3) => Return to read-eval-print level 3.
+; (RESTART 2) => Return to read-eval-print level 2.
+; (RESTART 1) => Return to read-eval-print level 1.
+
+7 error> (load "/home/martin/myProjects/SICP-Homework/evaluator-naive.scm")
+
+;            Loading "evaluator-naive.scm"...
+;Premature EOF on #[input-port 8 for file: "/home/martin/myProjects/SICP-Homework/evaluator-naive.scm"]
+;To continue, call RESTART with an option number:
+; (RESTART 7) => Return to read-eval-print level 7.
+; (RESTART 6) => Return to read-eval-print level 6.
+; (RESTART 5) => Return to read-eval-print level 5.
+; (RESTART 4) => Return to read-eval-print level 4.
+; (RESTART 3) => Return to read-eval-print level 3.
+; (RESTART 2) => Return to read-eval-print level 2.
+; (RESTART 1) => Return to read-eval-print level 1.
+
+8 error> (load "/home/martin/myProjects/SICP-Homework/evaluator-naive.scm")
+
+;              Loading "evaluator-naive.scm"...
+;Premature EOF on #[input-port 9 for file: "/home/martin/myProjects/SICP-Homework/evaluator-naive.scm"]
+;To continue, call RESTART with an option number:
+; (RESTART 8) => Return to read-eval-print level 8.
+; (RESTART 7) => Return to read-eval-print level 7.
+; (RESTART 6) => Return to read-eval-print level 6.
+; (RESTART 5) => Return to read-eval-print level 5.
+; (RESTART 4) => Return to read-eval-print level 4.
+; (RESTART 3) => Return to read-eval-print level 3.
+; (RESTART 2) => Return to read-eval-print level 2.
+; (RESTART 1) => Return to read-eval-print level 1.
+
+9 error> (restart 1)
+
+;              ... aborted
+;            ... aborted
+;          ... aborted
+;        ... aborted
+;      ... aborted
+;    ... aborted
+;  ... aborted
+;... aborted
+;Abort!
+
+1 ]=> (restart 1)
+
+;Abort!
+
+1 ]=> (load "/home/martin/myProjects/SICP-Homework/evaluator-naive.scm")
+
+;Loading "evaluator-naive.scm"...
+;Premature EOF on #[input-port 10 for file: "/home/martin/myProjects/SICP-Homework/evaluator-naive.scm"]
+;To continue, call RESTART with an option number:
+; (RESTART 1) => Return to read-eval-print level 1.
+
+2 error> (load "/home/martin/myProjects/SICP-Homework/evaluator-naive.scm")
+
+;  Loading "evaluator-naive.scm"...
+;Premature EOF on #[input-port 11 for file: "/home/martin/myProjects/SICP-Homework/evaluator-naive.scm"]
+;To continue, call RESTART with an option number:
+; (RESTART 2) => Return to read-eval-print level 2.
+; (RESTART 1) => Return to read-eval-print level 1.
+
+3 error> (load "/home/martin/myProjects/SICP-Homework/evaluator-naive1.scm")
+
+;Unable to find file "/home/martin/myProjects/SICP-Homework/evaluator-naive1.scm" because: File does not exist.
+;To continue, call RESTART with an option number:
+; (RESTART 3) => Return to read-eval-print level 3.
+; (RESTART 2) => Return to read-eval-print level 2.
+; (RESTART 1) => Return to read-eval-print level 1.
+
+4 error> (load "/home/martin/myProjects/SICP-Homework/evaluator-.scm")
+
+;Unable to find file "/home/martin/myProjects/SICP-Homework/evaluator-.scm" because: File does not exist.
+;To continue, call RESTART with an option number:
+; (RESTART 4) => Return to read-eval-print level 4.
+; (RESTART 3) => Return to read-eval-print level 3.
+; (RESTART 2) => Return to read-eval-print level 2.
+; (RESTART 1) => Return to read-eval-print level 1.
+
+5 error> (load "/home/martin/myProjects/SICP-Homework/evaluator-naive.scm")
+
+;    Loading "evaluator-naive.scm"...
+;Premature EOF on #[input-port 12 for file: "/home/martin/myProjects/SICP-Homework/evaluator-naive.scm"]
+;To continue, call RESTART with an option number:
+; (RESTART 5) => Return to read-eval-print level 5.
+; (RESTART 4) => Return to read-eval-print level 4.
+; (RESTART 3) => Return to read-eval-print level 3.
+; (RESTART 2) => Return to read-eval-print level 2.
+; (RESTART 1) => Return to read-eval-print level 1.
+
+6 error> (load "/home/martin/myProjects/SICP-Homework/evaluator-naive.scm")
+
+;      Loading "evaluator-naive.scm"...
+;Premature EOF on #[input-port 13 for file: "/home/martin/myProjects/SICP-Homework/evaluator-naive.scm"]
+;To continue, call RESTART with an option number:
+; (RESTART 6) => Return to read-eval-print level 6.
+; (RESTART 5) => Return to read-eval-print level 5.
+; (RESTART 4) => Return to read-eval-print level 4.
+; (RESTART 3) => Return to read-eval-print level 3.
+; (RESTART 2) => Return to read-eval-print level 2.
+; (RESTART 1) => Return to read-eval-print level 1.
+
+7 error> 
