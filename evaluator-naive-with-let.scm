@@ -101,7 +101,7 @@
   (cadr exps))
 (define (lambda-body exps)
   (cddr exps))
-(define (make-lambda para body)
+(define (make-lambdapara body)
   (cons `lambda (cons para body)))
 (define (lambda? exp)
   (tagged-list? exp `lambda))
@@ -134,7 +134,7 @@
 (define (eval-let exp env)
   (let ((args-vals (var-val-list-to-args-vals (car exp)))
 	(body (cdr exp)))
-    (myApply (eval (make-lambda (car args-vals) body) env) (cadr args-vals))))
+    (myApply (eval (make-lambda (car args-vals) body) env) (map (lambda (val) (eval val env)) (cadr args-vals)))))
 
 					;eval sequent setence
 (define (begin-action exp)
