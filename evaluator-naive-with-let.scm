@@ -134,7 +134,7 @@
 (define (eval-let exp env)
   (let ((args-vals (var-val-list-to-args-vals (car exp)))
 	(body (cdr exp)))
-    (myApply (eval (make-lambda (car args-vals) body) env) (cadr args-vals))))
+    (myApply (eval (make-lambda (car args-vals) body) env) (list-of-value (cadr args-vals) env))))x
 
 					;eval sequent setence
 (define (begin-action exp)
