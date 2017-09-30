@@ -1,7 +1,15 @@
 					;hide apply as 'apply-primitive-procedure'
 (define apply-in-underlying-scheme apply)
 
-;;utilities
+					;utilities
+
+(define (thunk? obj)
+  (tagged-list? obj `thunk))
+
+(define (delay-it exp env)
+  (log "delay:")
+  (log exp)
+  (cons `thunk (cons exp (cons env `()))))
 (define (showtag exp)
   (car tag))
 (define (tagged-list? exp tag)
@@ -14,6 +22,30 @@
   (display "log:")
   (display msg)
   (newline))
+(define (actual-value exp env)
+  (force-it (eval exp env)))
+
+					;for lazy evaluation
+(define (evaluated-thunk? obj)
+  (tagged-list? obj `evaluated-thunk))
+(define (thunk-value evaluated-thunk) (cadr evaluated-thunk))
+(define (force-it obj)
+  (cond ((thunk? obj)
+	 (let ((result (actual-value (thunk-exp obj) (thunk-env obj))))
+	   (set-car! obj `evaluated-thunk)
+	   (set-car! (cdr obj) reuslt)
+	   (set-cdr! (cdr obj) `());forget unnecessary env
+	   result))
+	((evaluated-thunk? obj)
+	 (thunk-value obj))
+	(else obj)))
+        
+
+(define (thunk-exp thunk)
+  (cadr thunk))
+(define (thunk-env thunk)
+  (caddr thunk))
+  
 
 					;dispatch query
 (define (variable? exp)
@@ -89,29 +121,24 @@
   (log "scan-out-defs")
   (log lambda-exp)
   (define (scan rest args vals)
-    (cond ((null? rest)  (make-let-internal-def args vals rest))
+    (cond ((null? rest) (make-let-internal-def args vals rest))
 	  ((definition? (car rest)) (scan (cdr rest) (append-to-list (definition-variable (car rest)) args) (append-to-list (definition-value (car rest)) vals)))
 	  (else (make-let-internal-def args vals rest))
 	  ))
   (scan lambda-exp `() `()))
-(define (extract-list-from-stream stream cnt)
-  (if (> cnt 0)
-      (cons (stream-car stream) (extract-list-from-stream (stream-cdr stream) (- cnt 1)))
-      `()))
-(define (cnt-list list)
-  (if (null? list)
-      0
-      (+ 1 (cnt-list (cdr list)))))
-(define (make-let-internal-def args vals rest)
+(define (make-let-internal-def args vals body)
+  (log "make-let-internal-def:")
+  (log "args-vals:")
+  (log (list args vals))
+  (log "body:")
+  (log body)
   (if (null? args)
-      rest
-      (let ((pesudo-args (extract-list-from-stream temp-args (cnt-list args))))
-	(let ((assignment-statement (make-let pesudo-args vals (map (lambda (x y) (list `set! x y)) args pesudo-args))))
-	  (list(make-let args (map (lambda (x) `*unassigned*) args) (cons assignment-statement rest)))))))
-(define (make-let args vals body)
-  (let ((arg-val-list (map (lambda (x y) (list x y)) args vals)))
-    (append (list `let arg-val-list) body)))
-		
+      body
+      (let ((args-list (map (lambda (x) (list x `*unassigned*)) args))
+	    (vals-list (map (lambda (x y) (list `set! x y)) args vals)))
+	(list (append (list `let args-list) (append vals-list body))))))
+
+
 					;eval definition
 
 (define (definition-variable exp)
@@ -146,7 +173,7 @@
 
 					;eval if
 (define (eval-if exp env)
-  (if (true? (eval (if-predicate exp) env))
+  (if (true? (actual-value (if-predicate exp) env))
       (eval (if-consequent exp) env)
       (eval (if-alternative exp) env)))
 (define (if? exp)
@@ -191,8 +218,6 @@
    ((last-exp? seq) (first-exp seq))
    (else (make-begin seq))
    ))
-(define (exp->seq exp)
-  (list exp))
 (define (eval-sequence exp env)
   (log "-------------SEPERATE-----------")
   (log "eval sequence")
@@ -229,11 +254,11 @@
 (define (procedure-environment exp)
   (cadddr exp))
 					;apply
-(define (myApply proc args)
+(define (myApply proc args env)
   ;;(log "apply proc:")
   ;;(log (car proc))
   (cond ((primitive-procedure? proc)
-	 (apply-primitive-procedure proc args))
+	 (apply-primitive-procedure proc (list-of-args-values args env)))
 	((compound-procedure? proc)
 	 (log "apply compound procedure--PROC BODY:")
 	 (log (procedure-body proc))
@@ -241,41 +266,35 @@
 	 (log (procedure-parameters proc))
 	 (eval-sequence (procedure-body proc)
 			(extend-environment (procedure-parameters proc)
-					    args
+					    (list-of-value args env)
 					    (procedure-environment proc))))
 	(else
-	 (error "UNKNOWN proc type--APPLY" (display proc))))
+	 (error "UNKNOWN proc type--APPLY" proc)))
   )
+(define (action-indicator-value exp)
+  (car exp))
 (define (list-of-value args env)
-  (map (lambda (arg) (eval arg env)) args))
+  (log "-------list-of-value----------")
+  (log "list of value")
+  (log args)
+  (let ((result (map (lambda (arg) (cond ((pair? arg)
+			    (delay-it (action-indicator-value arg) env))
+			   (else (actual-value arg env))))
+		     args)))
+    (log "list of value result")
+    (log result)
+    result))
+(define (list-of-args-values exps env)
+  (map (lambda (op) (actual-value op env)) exps))
+(define (list-of-delayed-args exps env)
+  ;;(log "list-of-delayed-args")
+  ;;(log exps)
+  (map (lambda (op) (delay-it op env)) exps))
 					;define boolean 
 (define (true? x)
   (not (eq? x #f)))
 (define (false? x)
   (eq? x #f))
-					;utilities
-(define (scale-stream stream factor)
-  (stream-map (lambda (x) (* x factor)) stream))
-(define (add-streams s1 s2)
-  (stream-map + s1 s2))
-(define (accum-stream op init sequence)
-  (if (stream-null? sequence)
-      init
-      (op (stream-car sequence)
-	  (accum-stream op init (stream-cdr sequence)))))
-(define (integral delayed-integrand initial-value dt)
-  (define int
-    (cons-stream initial-value
-		 (let ((integrand (force delayed-integrand)))
-		   (add-streams (scale-stream integrand dt)
-				int))))
-  int)
-(define (solve f y0 dt)
-  (define y (integral (delay dy) y0 dt))
-  (define dy (stream-map f y))
-  y)
-(define temp-args (solve (lambda (x) (* x 2)) 1 0.2))
-
 					;environment
 (define (frame-variables frame)
   (car frame))
@@ -397,14 +416,14 @@
     (eval-let (let-content exp) env))
    ((application? exp)
     (myApply
-     (eval (operator exp) env)
-     (list-of-value (operand exp) env)))
+     (actual-value (operator exp) env)
+     (operand exp) env))
    (else
     (error "Unknown expression type--EVAL" exp))
    ))
 					;input prompt
-(define input-prompt ";;; M-Eval input:")
-(define output-prompt ";;; M-Eval output:")
+(define input-prompt ";;; L-Eval input:")
+(define output-prompt ";;; L-Eval output:")
 (define (prompt-for-input string)
   (newline)
   (newline)
@@ -419,7 +438,7 @@
   (let ((input (read)))
     (display input)
     (newline)
-    (let ((output (eval input global-environment)))
+    (let ((output (actual-value input global-environment)))
       (announce-output output-prompt)
       (user-print output)))
   (driver-loop))

@@ -89,29 +89,24 @@
   (log "scan-out-defs")
   (log lambda-exp)
   (define (scan rest args vals)
-    (cond ((null? rest)  (make-let-internal-def args vals rest))
+    (cond ((null? rest) (make-let-internal-def args vals rest))
 	  ((definition? (car rest)) (scan (cdr rest) (append-to-list (definition-variable (car rest)) args) (append-to-list (definition-value (car rest)) vals)))
 	  (else (make-let-internal-def args vals rest))
 	  ))
   (scan lambda-exp `() `()))
-(define (extract-list-from-stream stream cnt)
-  (if (> cnt 0)
-      (cons (stream-car stream) (extract-list-from-stream (stream-cdr stream) (- cnt 1)))
-      `()))
-(define (cnt-list list)
-  (if (null? list)
-      0
-      (+ 1 (cnt-list (cdr list)))))
-(define (make-let-internal-def args vals rest)
+(define (make-let-internal-def args vals body)
+  (log "make-let-internal-def:")
+  (log "args-vals:")
+  (log (list args vals))
+  (log "body:")
+  (log body)
   (if (null? args)
-      rest
-      (let ((pesudo-args (extract-list-from-stream temp-args (cnt-list args))))
-	(let ((assignment-statement (make-let pesudo-args vals (map (lambda (x y) (list `set! x y)) args pesudo-args))))
-	  (list(make-let args (map (lambda (x) `*unassigned*) args) (cons assignment-statement rest)))))))
-(define (make-let args vals body)
-  (let ((arg-val-list (map (lambda (x y) (list x y)) args vals)))
-    (append (list `let arg-val-list) body)))
-		
+      body
+      (let ((args-list (map (lambda (x) (list x `*unassigned*)) args))
+	    (vals-list (map (lambda (x y) (list `set! x y)) args vals)))
+	(list (append (list `let args-list) (append vals-list body))))))
+
+
 					;eval definition
 
 (define (definition-variable exp)
@@ -191,8 +186,6 @@
    ((last-exp? seq) (first-exp seq))
    (else (make-begin seq))
    ))
-(define (exp->seq exp)
-  (list exp))
 (define (eval-sequence exp env)
   (log "-------------SEPERATE-----------")
   (log "eval sequence")
@@ -253,29 +246,6 @@
   (not (eq? x #f)))
 (define (false? x)
   (eq? x #f))
-					;utilities
-(define (scale-stream stream factor)
-  (stream-map (lambda (x) (* x factor)) stream))
-(define (add-streams s1 s2)
-  (stream-map + s1 s2))
-(define (accum-stream op init sequence)
-  (if (stream-null? sequence)
-      init
-      (op (stream-car sequence)
-	  (accum-stream op init (stream-cdr sequence)))))
-(define (integral delayed-integrand initial-value dt)
-  (define int
-    (cons-stream initial-value
-		 (let ((integrand (force delayed-integrand)))
-		   (add-streams (scale-stream integrand dt)
-				int))))
-  int)
-(define (solve f y0 dt)
-  (define y (integral (delay dy) y0 dt))
-  (define dy (stream-map f y))
-  y)
-(define temp-args (solve (lambda (x) (* x 2)) 1 0.2))
-
 					;environment
 (define (frame-variables frame)
   (car frame))
