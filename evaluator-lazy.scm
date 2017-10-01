@@ -1,7 +1,26 @@
 					;hide apply as 'apply-primitive-procedure'
 (define apply-in-underlying-scheme apply)
-
+					;make primitive procedure delayed
+(define (lazy-map proc items);;make map unprimitive
+  (map proc items))
+(define (cons x y)
+  (lambda (m) ( m x y)))
+(define (car z)
+  (z (lambda (p q) p)))
+(define (cdr z)
+  (z (lambda (p q) q)))
+(define (list-ref items n)
+  (if (= n 0)
+      (car items)
+      (list-ref (cdr items) ( - n 1))))
+(define (scale-list items factor)
+  (map (lambda (x) (* x factor)) items))
+(define (add-items item1 item2)
+  (cond ((null? item1) item2)
+	((null? item2) item1)
+	(else (map (lambda (x y) (+ x y)) item1 item2))))
 					;utilities
+
 
 (define (thunk? obj)
   (tagged-list? obj `thunk))
@@ -374,6 +393,7 @@
 	;(list `or or)
 	(list `> >)
 	(list `< <)
+	(list `map lazy-map)
 	(list `cdr cdr)
 	(list `list list)
 	(list `cons cons)

@@ -2,7 +2,7 @@
 ;;(define apply-in-underlying-scheme apply)
 (define apply-in-underlying-scheme apply)
 
-					;utilities
+;;utilities
 (define (showtag exp)
   (car tag))
 (define (tagged-list? exp tag)
@@ -14,7 +14,7 @@
   (display msg)
   (newline))
 
-					;dispatch query
+;;dispatch query
 (define (variable? exp)
   (symbol? exp))
 (define (quote? exp)
@@ -38,11 +38,11 @@
 (define (lambda? exp)
   (tagged-list? exp `lambda))
 
-					;eval quotation
+;;eval quotation
 (define (text-of-quotation exp)
   (cdr exp))
 
-					;eval conditional sentence
+;;eval conditional sentence
 (define (cond-clauses exp)
   (cdr exp))
 (define (cond-predicate clause)
@@ -94,7 +94,7 @@
   (define-variable! (definition-variable exp)
     (eval (definition-value exp) env)
     env)
-  ;;(display (first-frame env))
+					;(display (first-frame env))
   `ok)
 
 					;eval lambda:
@@ -121,7 +121,7 @@
 (define (if-alternative exp)
   (if (not (null? (cdddr exp)))
       (cadddr exp)
-      `false));;no alternative situation
+      `false));no alternative situation
 (define (make-if predicate consequent alternative)
   (list `if predicate consequent alternative))
 
@@ -136,7 +136,7 @@
   (cdr exp))
 (define (make-begin seq)
   (cons `begin seq))
-(define (seq->exp seq);;used in cond sentence where no begin tagged
+(define (seq->exp seq);used in cond sentence where no begin tagged
   (cond 
    ((null? seq) seq)
    ((last-exp? seq) (first-exp seq))
@@ -301,8 +301,8 @@
    ((if? exp) (eval-if exp env))
    ((cond? exp) (eval-cond exp env))
    ((lambda? exp)
-    (make-procedure (lambda-body exp)
-		    (lambda-parameters exp)
+    (make-procedure (lambda-parameters exp)
+		    (lambda-body exp)
 		    env)
     )
    ((begin? exp)
