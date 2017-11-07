@@ -68,7 +68,8 @@
 
 					;dispatch query
 (define (delay? exp)
-  (tagged-list? exp `delay))
+  (tagged-list? exp `delay)
+  #t)
 (define (variable? exp)
   (symbol? exp))
 (define (quote? exp)
