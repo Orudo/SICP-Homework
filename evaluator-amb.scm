@@ -1,15 +1,7 @@
 					;hide apply as 'apply-primitive-procedure'
 (define apply-in-underlying-scheme apply)
 
-					;utilities
-
-(define (thunk? obj)
-  (tagged-list? obj `thunk))
-
-(define (delay-it exp env)
-  (log "delay:")
-  (log exp)
-  (cons `thunk (cons exp (cons env `()))))
+;;utilities
 (define (showtag exp)
   (car tag))
 (define (tagged-list? exp tag)
@@ -22,36 +14,14 @@
   (display "log:")
   (display msg)
   (newline))
-(define (actual-value exp env)
-  (force-it (eval exp env)))
-
-					;for lazy evaluation
-(define (evaluated-thunk? obj)
-  (tagged-list? obj `evaluated-thunk))
-(define (thunk-value evaluated-thunk) (cadr evaluated-thunk))
-(define (force-it obj)
-  (cond ((thunk? obj)
-	 (let ((result (actual-value (thunk-exp obj) (thunk-env obj))))
-	   (set-car! obj `evaluated-thunk)
-	   (set-car! (cdr obj) reuslt)
-	   (set-cdr! (cdr obj) `());forget unnecessary env
-	   result))
-	((evaluated-thunk? obj)
-	 (thunk-value obj))
-	(else obj)))
-        
-
-(define (thunk-exp thunk)
-  (cadr thunk))
-(define (thunk-env thunk)
-  (caddr thunk))
-  
 
 					;dispatch query
+(define (amb? exp)
+  (tagged-list? exp `amb))
 (define (variable? exp)
   (symbol? exp))
-(define (quote? exp)
-  (tagged-list? exp `quote))
+(define (quoted? exp)
+  (tagged-list? exp `quasiquote))
 (define (application? exp)
   (pair? exp))
 (define (assignment? exp)
@@ -73,10 +43,94 @@
 	(else #f)))
 (define (lambda? exp)
   (tagged-list? exp `lambda))
+					;amb
+(define (list-ref x list)
+  (define (loop list cnt)
+    (if (= cnt 0)
+	(car list)
+	(loop (cdr list) (- cnt 1))))
+  (loop list x))
+(define (list-length list)
+  (if (null? list)
+      0
+      (list-length (cdr list))))
+(define (get-an-element list)
+  (define (remove list x)
+    (if (= x 0)
+	(cdr list)
+	(cons (car list) (get (cdr list (- x 1))))))
+  (let ((pos (random (list-length list))))
+    (if (= pos 0)
+	(error "choice list empty!!!")
+	(list (= pos 0) (list-ref pos list) (remove list pos)))))
+
+
+(define (analyze-ramb exp)
+  (let ((cprocs (map analyze (amb-choice exp))))
+    (lambda (env succeed fail)
+      (define (try-next choice)
+	(let ((choice-pair (get-an-element choice)))
+	  (let ((success? (car choice-pair))
+		(current-choice (cadr choice-pair))
+		(rest-choice (caddr choice-pair)))
+	    (if success?
+		(fail)
+		(current-choice env
+		 succeed
+		 (lambda () (try-next rest-choice))))))))))
+	  
+(define (analyze-amb exp)
+  (let ((cprocs (map analyze (amb-choice exp))))
+    (lambda (env succeed fail)
+      (define (try-next choices)
+	(if (null? choices)
+	    (fail)
+	    ((car choices) env
+	     succeed
+	     (lambda () (try-next (cdr choices))))))
+      (try-next cprocs))))
+(define (amb-choice exp) (cdr exp))
+(define (ambeval exp env succeed fail)
+  ((analyze exp) env succeed fail))
+
 
 					;eval quotation
 (define (text-of-quotation exp)
-  (cdr exp))
+  (cadr exp))
+(define (analyze-quoted exp)
+  (let ((qval (text-of-quotation exp)))
+    (lambda (env succeed fail)
+      (succeed qval fail))))
+					;eval self-evaluating expression
+(define (analyze-self-evaluating exp)
+  (lambda (env succeed fail)
+    (succeed exp fail)))
+
+					;eval lambda
+(define (analyze-sequence exps)
+  (define (sequentially proc1 proc2)
+    (lambda (env succeed fail)
+      (proc1 env
+	     (lambda (proc1-value fail2)
+	       (proc2 env succeed fail2))
+	     fail)))
+  (define (loop first-proc rest-proc)
+    (if (null? rest-proc)
+	first-proc
+	(loop (sequentially first-proc (car rest-proc))
+	      (cdr rest-proc))))
+  (let ((procs (map analyze exps)))
+    (if (null? procs)
+	(error "EMPTY SEQUENCE -- ANALYZE")
+	(loop (car procs) (cdr procs)))))
+(define (analyze-lambda exp)
+  (lambda (env succeed fail) (succeed (make-procedure (lambda-parameters exp)
+						      (analyze-sequence(lambda-body exp))
+						      env) fail)))
+					;eval variable
+
+(define (analyze-variable exp)
+  (lambda (env succeed) (succeed (lookup-variable-value exp env) fail)))
 
 					;eval conditional sentence
 (define (cond-clauses exp)
@@ -114,6 +168,21 @@
 		       (eval (assignment-value exp) env)
 		       env)
   `ok)
+(define (analyze-assignment exp)
+  (let ((var (definition-variable exp))
+	(pre-val (analyze (definition-value exp))))
+    (lambda (env succeed fail)
+      (pre-val env
+	       (lambda (val fail2)
+		 (let ((old-value (lookup-variable-value! var val env)))
+		   (set-variable-value! var val env)
+		   (succeed `ok
+			    (lambda ()
+			      (set-variable-value var
+						  old-value
+						  env)
+			      (fail2)))))
+	       fail))))
 					;internal definition
 (define (append-to-list args lists)
   (cons args lists))
@@ -160,6 +229,15 @@
     env)
   ;;(display (first-frame env))
   `ok)
+(define (analyze-definition exp)
+  (let ((var (definition-variable exp))
+	(val (analyze (definition-value exp))))
+    (lambda (env succeed fail)
+      (val env
+	   (lambda (val fail2)
+	     (definition-variable! var val env)
+	     (succeed `ok fail2))
+	   fail))))
 
 					;eval lambda:
 (define (lambda-parameters exps)
@@ -172,8 +250,20 @@
   (tagged-list? exp `lambda))
 
 					;eval if
+(define (analyze-if exp)
+  (let ((analyzed-predicate (analyze (if-perdicate exp)))
+	(analyzed-consequent (analyze (if-consequent exp)))
+	(analyzed-alternative (analyze (if-alternative exp))))
+    (lambda (env succeed fail)
+      (analyzed-predicate env
+			  (lambda (pred-value fail2)
+			    (if (true? pred-value)
+				(analyzed-consequent env succeed fail2)
+				(analyzed-alternative env succeed fail2)))
+			  fail))))
+		      
 (define (eval-if exp env)
-  (if (true? (actual-value (if-predicate exp) env))
+  (if (true? (eval (if-predicate exp) env))
       (eval (if-consequent exp) env)
       (eval (if-alternative exp) env)))
 (define (if? exp)
@@ -188,6 +278,7 @@
       `false));;no alternative situation
 (define (make-if predicate consequent alternative)
   (list `if predicate consequent alternative))
+
 					;eval let
 (define (let? exp)
   (tagged-list? exp `let))
@@ -229,11 +320,11 @@
 					;eval applications:
 (define (operator exp)
   (car exp))
-(define (operand exp)
+(define (operands exp)
   (cdr exp))
 (define (first-operand ops)
   (car ops))
-(define (rest-operand ops)
+(define (rest-operands ops)
   (cdr ops))
 
 					;eval procedure (apply)
@@ -254,11 +345,51 @@
 (define (procedure-environment exp)
   (cadddr exp))
 					;apply
-(define (myApply proc args env)
+(define (analyze-application exp)
+  (let ((fproc (analyze (operator exp)))
+	(aprocs (map analyze (operands exp))))
+    (lambda (env succeed fail)
+      (aprocs env
+	      (lambda (proc fail2)
+		(get-args aprocs
+			  env
+			  (lambda (args fail3)
+			    (execute-application
+			     proc args succeed fail3))
+			  fail2))
+	      fail))))
+(define (get-args aprocs env succeed fail)
+  (if (null? aprocs)
+      (succeed `() fail)
+      ((car aprocs)
+       env
+       (lambda (arg fail2)
+	 (get-args (cdr aprocs)
+		   env
+		   (lambda (args fail3)
+		     (succeed (cons arg args)
+			      fail3))
+		   fail2))
+       fail)))
+(define (execute-application proc args succeed fail)
+  (cond ((primitive-procedure? proc)
+	 (succeed (apply-primitive-procedure proc args) fail))
+	((compound-procedure? proc)
+	 ((procedure-body proc)
+	  (extend-environment (procedure-parameters proc)
+			      args
+			      (procedure-environment proc))
+	  succeed
+	  fail))
+	(else
+	 (error
+	  "Unknown procedure type --- EXECUTE-APPLICATION" proc))))
+
+(define (myApply proc args)
   ;;(log "apply proc:")
   ;;(log (car proc))
   (cond ((primitive-procedure? proc)
-	 (apply-primitive-procedure proc (list-of-args-values args env)))
+	 (apply-primitive-procedure proc args))
 	((compound-procedure? proc)
 	 (log "apply compound procedure--PROC BODY:")
 	 (log (procedure-body proc))
@@ -266,30 +397,13 @@
 	 (log (procedure-parameters proc))
 	 (eval-sequence (procedure-body proc)
 			(extend-environment (procedure-parameters proc)
-					    (list-of-value args env)
+					    args
 					    (procedure-environment proc))))
 	(else
-	 (error "UNKNOWN proc type--APPLY" proc)))
+	 (error "UNKNOWN proc type--APPLY" (display proc))))
   )
-(define (action-indicator-value exp)
-  (car exp))
 (define (list-of-value args env)
-  (log "-------list-of-value----------")
-  (log "list of value")
-  (log args)
-  (let ((result (map (lambda (arg) (cond ((pair? arg)
-			    (delay-it (action-indicator-value arg) env))
-			   (else (actual-value arg env))))
-		     args)))
-    (log "list of value result")
-    (log result)
-    result))
-(define (list-of-args-values exps env)
-  (map (lambda (op) (actual-value op env)) exps))
-(define (list-of-delayed-args exps env)
-  ;;(log "list-of-delayed-args")
-  ;;(log exps)
-  (map (lambda (op) (delay-it op env)) exps))
+  (map (lambda (arg) (eval arg env)) args))
 					;define boolean 
 (define (true? x)
   (not (eq? x #f)))
@@ -371,6 +485,7 @@
 	(list `- -)
 	(list `* *)
 	(list `/ /)
+	;(list `an-element-of an-element-of)
 	;(list `or or)
 	(list `> >)
 	(list `< <)
@@ -393,6 +508,35 @@
 (define (primitive-implementation proc)
   (cadr proc))
 					;evaluator
+(define (analyze exp)
+  (log "---------------SEPERATE---------------")
+  (log "analyze content:")
+  (log exp)
+  (cond ((self-evaluating? exp)
+	 (analyze-self-evaluating exp))
+	((amb? exp)
+	 (analyze-amb exp))
+	((quoted? exp)
+	 (analyze-quoted exp))
+	((variable? exp)
+	 (analyze-variable exp))
+	((assignment? exp)
+	 (analyze-assignment exp))
+	((definition? exp)
+	 (analyze-definition exp))
+	((if? exp)
+	 (analyze-if exp))
+	((lambda? exp)
+	 (analyze-lambda exp))
+	((begin? exp)
+	 (analyze-sequence (begin-action exp)))
+	((cond? exp)
+	 (analyze (cond->if exp)))
+	((application? exp)
+	 (analyze-application exp))
+	(else
+	 (error "UNKNOWN EXPRESSION TYPE ---- ANALYZE" exp))))
+
 (define (eval exp env)
   (log "---------------SEPERATE---------------")
   (log "eval content:")
@@ -416,14 +560,14 @@
     (eval-let (let-content exp) env))
    ((application? exp)
     (myApply
-     (actual-value (operator exp) env)
-     (operand exp) env))
+     (eval (operator exp) env)
+     (list-of-value (operands exp) env)))
    (else
     (error "Unknown expression type--EVAL" exp))
    ))
 					;input prompt
-(define input-prompt ";;; L-Eval input:")
-(define output-prompt ";;; L-Eval output:")
+(define input-prompt ";;; Amb-Eval input:")
+(define output-prompt ";;; Amb-Eval output:")
 (define (prompt-for-input string)
   (newline)
   (newline)
@@ -434,15 +578,30 @@
   (display string)
   (newline))
 (define (driver-loop)
-  (prompt-for-input input-prompt)
-  (let ((input (read)))
-    (display input)
-    (newline)
-    (let ((output (actual-value input global-environment)))
-      (announce-output output-prompt)
-      (user-print output)))
-  (driver-loop))
-
+  (define (internal-loop try-again)
+    (prompt-for-input input-prompt)
+    (let ((input (read)))
+      (if (eq? input `try-again)
+	  (try-again)
+	  (begin
+	    (newline)
+	    (display ";;; Starting a new problem")
+	    (ambeval input
+		     global-environment;;env
+		     (lambda (val next-alternative)
+		       (announce-output output-prompt)
+		       (user-print val)
+		       (internal-loop next-alternative))
+		     (lambda ()
+		       (announce-output ";;; there are no more values of ")
+		       (user-print input)
+		       (driver-loop));;global fail
+		     )))))
+  (internal-loop
+   (lambda ()
+     (newline)
+     (display ";;;There is no current problem")
+     (driver-loop))))
 (define (user-print object)
   (if (compound-procedure? object)
       (display (list `compound-procedure
@@ -452,3 +611,11 @@
       (display object)
       ))
 
+
+
+
+
+
+
+
+					;exercise

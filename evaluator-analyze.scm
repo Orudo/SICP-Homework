@@ -1,34 +1,7 @@
 					;hide apply as 'apply-primitive-procedure'
 (define apply-in-underlying-scheme apply)
-					;make primitive procedure delayed
-(define (lazy-map proc items);;make map unprimitive
-  (map proc items))
-(define (cons x y)
-  (lambda (m) ( m x y)))
-(define (car z)
-  (z (lambda (p q) p)))
-(define (cdr z)
-  (z (lambda (p q) q)))
-(define (list-ref items n)
-  (if (= n 0)
-      (car items)
-      (list-ref (cdr items) ( - n 1))))
-(define (scale-list items factor)
-  (map (lambda (x) (* x factor)) items))
-(define (add-items item1 item2)
-  (cond ((null? item1) item2)
-	((null? item2) item1)
-	(else (map (lambda (x y) (+ x y)) item1 item2))))
-					;utilities
 
-
-(define (thunk? obj)
-  (tagged-list? obj `thunk))
-
-(define (delay-it exp env)
-  (log "delay:")
-  (log exp)
-  (cons `thunk (cons exp (cons env `()))))
+;;utilities
 (define (showtag exp)
   (car tag))
 (define (tagged-list? exp tag)
@@ -41,35 +14,8 @@
   (display "log:")
   (display msg)
   (newline))
-(define (actual-value exp env)
-  (force-it (eval exp env)))
-
-					;for lazy evaluation
-(define (evaluated-thunk? obj)
-  (tagged-list? obj `evaluated-thunk))
-(define (thunk-value evaluated-thunk) (cadr evaluated-thunk))
-(define (force-it obj)
-  (cond ((thunk? obj)
-	 (let ((result (actual-value (thunk-exp obj) (thunk-env obj))))
-	   (set-car! obj `evaluated-thunk)
-	   (set-car! (cdr obj) reuslt)
-	   (set-cdr! (cdr obj) `());forget unnecessary env
-	   result))
-	((evaluated-thunk? obj)
-	 (thunk-value obj))
-	(else obj)))
-        
-
-(define (thunk-exp thunk)
-  (cadr thunk))
-(define (thunk-env thunk)
-  (caddr thunk))
-  
 
 					;dispatch query
-(define (delay? exp)
-  (tagged-list? exp `delay)
-  #t)
 (define (variable? exp)
   (symbol? exp))
 (define (quote? exp)
@@ -99,6 +45,33 @@
 					;eval quotation
 (define (text-of-quotation exp)
   (cdr exp))
+(define (analyze-quoted exp)
+  (let ((qval (text-of-quotation exp)))
+    (lambda (env) qval)))
+					;eval self-evaluating expression
+(define (analyze-self-evaluating exp)
+  (lambda (env) exp))
+					;eval lambda
+(define (analyze-sequence exps)
+  (define (sequentially proc1 proc2)
+    (lambda (env) (proc1 env) (proc2 env)))
+  (define (loop first-proc rest-proc)
+    (if (null? rest-proc)
+	first-proc
+	(loop (sequentially first-proc (car rest-proc))
+	      (cdr rest-proc))))
+  (let ((procs (map analyze exps)))
+    (if (null? procs)
+	(error "EMPTY SEQUENCE -- ANALYZE")
+	(loop (car procs) (cdr procs)))))
+(define (analyze-lambda exp)
+  (lambda (env) (make-procedure (lambda-parameters exp)
+				(analyze-sequence (lambda-body exp))
+				env)))
+					;eval variable
+
+(define (analyze-variable exp)
+  (lambda (env) (lookup-variable-value exp env)))
 
 					;eval conditional sentence
 (define (cond-clauses exp)
@@ -136,6 +109,11 @@
 		       (eval (assignment-value exp) env)
 		       env)
   `ok)
+(define (analyze-assignment exp)
+  (lambda (env) (set-variable-value! (assignment-variable exp)
+				     ((analyze (assignment-value exp)) env)
+				     env)
+	  `ok))
 					;internal definition
 (define (append-to-list args lists)
   (cons args lists))
@@ -182,6 +160,12 @@
     env)
   ;;(display (first-frame env))
   `ok)
+(define (analyze-definition exp)
+  (let ((var (definition-variable exp))
+	(val (definition-value exp)))
+    (lambda (env)
+      (define-variable! var (val env) env)
+      `ok)))
 
 					;eval lambda:
 (define (lambda-parameters exps)
@@ -194,8 +178,16 @@
   (tagged-list? exp `lambda))
 
 					;eval if
+(define (analyze-if exp)
+  (let ((analyzed-predicate (analyze (if-perdicate exp)))
+	(analyzed-consequent (analyze (if-consequent exp)))
+	(analyzed-alternative (analyze (if-alternative exp))))
+    (lambda (env) (if (true? (analyzed-predicate env))
+		      (analyzed-consequent env)
+		      (analyzed-alternative env)))))
+		      
 (define (eval-if exp env)
-  (if (true? (actual-value (if-predicate exp) env))
+  (if (true? (eval (if-predicate exp) env))
       (eval (if-consequent exp) env)
       (eval (if-alternative exp) env)))
 (define (if? exp)
@@ -210,6 +202,7 @@
       `false));;no alternative situation
 (define (make-if predicate consequent alternative)
   (list `if predicate consequent alternative))
+
 					;eval let
 (define (let? exp)
   (tagged-list? exp `let))
@@ -276,11 +269,30 @@
 (define (procedure-environment exp)
   (cadddr exp))
 					;apply
-(define (myApply proc args env)
+(define (analyze-application exp)
+  (let ((fproc (analyze (operator exp)))
+	(aprocs (map analyze (operands exp))))
+    (lambda (env)
+      (execute-application (fproc env)
+			   (map (lambda (aproc) (aproc env)) aprocs)
+			   ))))
+(define (execute-application proc args)
+  (cond ((primitive-procedure? proc)
+	 (apply-primitive-procedure proc args))
+	((compound-procedure? proc)
+	 ((procedure-body proc)
+	  (extend-environment (procedure-parameters proc)
+			      args
+			      (procedure-environment proc))))
+	(else
+	 (error
+	  "Unknown procedure type --- EXECUTE-APPLICATION" proc))))
+
+(define (myApply proc args)
   ;;(log "apply proc:")
   ;;(log (car proc))
   (cond ((primitive-procedure? proc)
-	 (apply-primitive-procedure proc (list-of-args-values args env)))
+	 (apply-primitive-procedure proc args))
 	((compound-procedure? proc)
 	 (log "apply compound procedure--PROC BODY:")
 	 (log (procedure-body proc))
@@ -288,28 +300,13 @@
 	 (log (procedure-parameters proc))
 	 (eval-sequence (procedure-body proc)
 			(extend-environment (procedure-parameters proc)
-					    (list-of-value args env)
+					    args
 					    (procedure-environment proc))))
 	(else
-	 (error "UNKNOWN proc type--APPLY" proc)))
+	 (error "UNKNOWN proc type--APPLY" (display proc))))
   )
-(define (action-indicator-value exp)
-  (cadr exp))
 (define (list-of-value args env)
-  (log "-------list-of-value----------")
-  (log "list of value")
-  (log args)
-  (let ((result (map (lambda (arg) (if (delay? arg)
-				       (delay-it (action-indicator-value arg) env)
-				       (actual-value arg env)))
-		     args)))
-    result))
-(define (list-of-args-values exps env)
-  (map (lambda (op) (actual-value op env)) exps))
-(define (list-of-delayed-args exps env)
-  ;;(log "list-of-delayed-args")
-  ;;(log exps)
-  (map (lambda (op) (delay-it op env)) exps))
+  (map (lambda (arg) (eval arg env)) args))
 					;define boolean 
 (define (true? x)
   (not (eq? x #f)))
@@ -394,7 +391,6 @@
 	;(list `or or)
 	(list `> >)
 	(list `< <)
-	(list `map lazy-map)
 	(list `cdr cdr)
 	(list `list list)
 	(list `cons cons)
@@ -414,6 +410,33 @@
 (define (primitive-implementation proc)
   (cadr proc))
 					;evaluator
+(define (analyze exp)
+  (log "---------------SEPERATE---------------")
+  (log "analyze content:")
+  (log exp)
+  (cond ((self-evaluating? exp)
+	 (analyze-self-evaluating exp))
+	((quoted? exp)
+	 (analyze-quoted exp))
+	((variable? exp)
+	 (analyze-variable exp))
+	((assignment? exp)
+	 (analyze-assignment exp))
+	((definition? exp)
+	 (analyze-definition exp))
+	((if? exp)
+	 (analyze-if exp))
+	((lambda? exp)
+	 (analyze-lambda exp))
+	((begin? exp)
+	 (analyze-consequence (begin-action exp)))
+	((cond? exp)
+	 (analyze (cond->if exp)))
+	((application? exp)
+	 (analyze-application exp))
+	(else
+	 (error "UNKNOWN EXPRESSION TYPE ---- ANALYZE" exp))))
+
 (define (eval exp env)
   (log "---------------SEPERATE---------------")
   (log "eval content:")
@@ -437,14 +460,14 @@
     (eval-let (let-content exp) env))
    ((application? exp)
     (myApply
-     (actual-value (operator exp) env)
-     (operand exp) env))
+     (eval (operator exp) env)
+     (list-of-value (operand exp) env)))
    (else
     (error "Unknown expression type--EVAL" exp))
    ))
 					;input prompt
-(define input-prompt ";;; L-Eval input:")
-(define output-prompt ";;; L-Eval output:")
+(define input-prompt ";;; M-Eval input:")
+(define output-prompt ";;; M-Eval output:")
 (define (prompt-for-input string)
   (newline)
   (newline)
@@ -459,7 +482,7 @@
   (let ((input (read)))
     (display input)
     (newline)
-    (let ((output (actual-value input global-environment)))
+    (let ((output ((analyze input) global-environment)))
       (announce-output output-prompt)
       (user-print output)))
   (driver-loop))
